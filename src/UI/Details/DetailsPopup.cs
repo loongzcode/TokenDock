@@ -10,6 +10,7 @@ namespace TokenDock
         readonly TaskbarControl bar;
         readonly OverviewControl overview;
         public event Action HistoryRequested;
+        public string SelectedKey { get { return overview.SelectedKey; } }
         public DetailsPopup(UsageMonitor m, TaskbarControl b)
         {
             monitor = m;
@@ -26,6 +27,7 @@ namespace TokenDock
                 Dock = DockStyle.Fill
             };
             Controls.Add(overview);
+            overview.AllRequested += delegate { ShowPopup(); };
             overview.CloseRequested += delegate
             {
                 Hide();
@@ -69,12 +71,18 @@ namespace TokenDock
 
         public void ShowPopup()
         {
+            ShowPopup(null);
+        }
+
+        public void ShowPopup(string key)
+        {
+            overview.SelectItem(key);
             Rectangle anchor = bar.ScreenBounds;
             if (anchor.IsEmpty)
                 anchor = Screen.PrimaryScreen.WorkingArea;
             Rectangle area = Screen.FromRectangle(anchor).WorkingArea;
             float scale = NativeMethods.Dpi(NativeMethods.FindWindow("Shell_TrayWnd", null));
-            Size = new Size((int)(420 * scale), Math.Min((int)(600 * scale), area.Height - 24));
+            Size = new Size((int)(420 * scale), Math.Min((int)(DetailSelection.Height(overview.SelectedKey, monitor) * scale), area.Height - 24));
             Left = Math.Max(area.Left + 12, Math.Min(area.Right - Width - 12, anchor.Left));
             Top = Math.Max(area.Top + 12, area.Bottom - Height - 12);
             Show();

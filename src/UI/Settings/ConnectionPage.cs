@@ -6,7 +6,7 @@ namespace TokenDock
     class ConnectionPage : SettingsPage
     {
         readonly TextBox codex, key;
-        readonly CheckBox startup, gatt;
+        readonly CheckBox startup, gatt, updates;
         readonly NumericUpDown refresh;
         bool clearKey;
         public bool StartupEnabled
@@ -61,6 +61,8 @@ namespace TokenDock
             Row("刷新间隔（秒）", refresh);
             gatt = Check("读取标准蓝牙电量", settings.GattFallback);
             startup = Check("登录 Windows 后启动", StartupRegistration.IsEnabled());
+            updates = Check("自动检查新版本（启动及每 6 小时）", settings.CheckUpdatesEnabled);
+            updates.Name = "CheckUpdatesEnabled";
         }
 
         public override void Apply(Settings settings)
@@ -72,6 +74,7 @@ namespace TokenDock
                 settings.SetKey(key.Text);
             settings.RefreshSeconds = (int)refresh.Value;
             settings.GattFallback = gatt.Checked;
+            settings.CheckUpdatesEnabled = updates.Checked;
         }
     }
 }

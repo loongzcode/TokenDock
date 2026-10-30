@@ -19,6 +19,13 @@ namespace TokenDock
 
         public static Rectangle PositionedSlot(Rectangle taskbarBounds, IEnumerable<Rectangle> blocked, int desired, int minimum, int padding, int height, string mode, int requestedX)
         {
+            return PositionedSlot(taskbarBounds, blocked, desired, minimum, padding, height, mode, requestedX, false);
+        }
+
+        public static Rectangle PositionedSlot(Rectangle taskbarBounds, IEnumerable<Rectangle> blocked, int desired, int minimum, int padding, int height, string mode, int requestedX, bool preserveRegion)
+        {
+            if (blocked == null)
+                return Rectangle.Empty;
             var intervals = blocked.Where(r => r.IntersectsWith(taskbarBounds)).OrderBy(r => r.Left).ToList();
             var gaps = new List<Rectangle>();
             int cursor = taskbarBounds.Left + padding;
@@ -38,6 +45,15 @@ namespace TokenDock
             Rectangle candidate;
             if (mode == "custom")
             {
+                if (preserveRegion)
+                {
+                    // Resizing the taskbar may clamp the anchor; ordinary relayout must
+                    // not move a saved position across occupied taskbar buttons.
+                    requestedX = Math.Max(taskbarBounds.Left + padding, Math.Min(requestedX, taskbarBounds.Right - padding - minimum));
+                    eligible = eligible.Where(r => r.Left < requestedX + desired && r.Right > requestedX).ToList();
+                    if (eligible.Count == 0)
+                        return Rectangle.Empty;
+                }
                 candidate = eligible.OrderBy(r => Math.Abs(Math.Max(r.Left, Math.Min(requestedX, r.Right - Math.Min(desired, r.Width))) - requestedX)).First();
                 int width = Math.Min(desired, candidate.Width);
                 int x = Math.Max(candidate.Left, Math.Min(requestedX, candidate.Right - width));

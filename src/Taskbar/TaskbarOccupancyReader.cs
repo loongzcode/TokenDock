@@ -10,6 +10,7 @@ namespace TokenDock
         public static List<Rectangle> Read(IntPtr handle)
         {
             var result = new List<Rectangle>();
+            bool incomplete = false;
             try
             {
                 var root = AutomationElement.FromHandle(handle);
@@ -26,6 +27,7 @@ namespace TokenDock
                     }
                     catch
                     {
+                        incomplete = true;
                     }
                 }
             }
@@ -34,7 +36,7 @@ namespace TokenDock
                 return null;
             }
 
-            return result.Count > 0 ? result : null;
+            return !incomplete && result.Count > 0 ? result : null;
         }
     }
 }

@@ -42,6 +42,9 @@ namespace TokenDock
         }
 
         public event Action OpenDetails;
+        public event Action<string> OpenItemDetails;
+        public event Action PlacementChanged;
+        string notifiedPlacement;
         public event Action OpenHistory;
         public string Placement
         {
@@ -81,8 +84,14 @@ namespace TokenDock
             MouseClick += delegate (object sender, MouseEventArgs e)
             {
                 HidePreview();
-                if (e.Button == MouseButtons.Left && !drag.SuppressClick && OpenDetails != null)
-                    OpenDetails();
+                if (e.Button == MouseButtons.Left && !drag.SuppressClick)
+                {
+                    string key = TaskbarDrawing.HitTest(CurrentItems(), contentWidth, e.X / scale, Config.TaskbarStyle == "compact");
+                    if (key != null && OpenItemDetails != null)
+                        OpenItemDetails(key);
+                    else if (OpenDetails != null)
+                        OpenDetails();
+                }
             };
             MouseEnter += delegate
             {
@@ -122,6 +131,7 @@ namespace TokenDock
                     layoutTimer.Stop();
                     Hide();
                     placement = "任务栏连接失败";
+                    WriteDiagnostic();
                     ReportError(error);
                 }
             };
@@ -357,6 +367,7 @@ namespace TokenDock
             {
                 Hide();
                 placement = "未找到 Windows 任务栏";
+                WriteDiagnostic();
                 return;
             }
 
@@ -416,26 +427,19 @@ namespace TokenDock
             }
 
             int desired = (int)Math.Ceiling(natural * scale), minimum = Math.Min(desired, (int)(80 * scale)), height = Math.Min(bounds.Height, (int)(28 * scale));
-            var blocks = occupied == null ? new List<Rectangle>() : new List<Rectangle>(occupied);
+            if (occupied == null)
+            {
+                Hide();
+                placement = "正在检测任务栏可用位置";
+                WriteDiagnostic();
+                return;
+            }
+
+            var blocks = new List<Rectangle>(occupied);
             Rectangle tray = NativeMethods.Bounds(NativeMethods.FindWindowEx(taskbar, IntPtr.Zero, "TrayNotifyWnd", null));
             if (!tray.IsEmpty)
                 blocks.Add(tray);
-            if (occupied == null)
-            {
-                Rectangle start = NativeMethods.Bounds(NativeMethods.FindWindowEx(taskbar, IntPtr.Zero, "Start", null));
-                if (start.IsEmpty || start.Left - bounds.Left < desired + 160 * scale)
-                {
-                    Hide();
-                    placement = "正在检测任务栏可用位置";
-                    WriteDiagnostic();
-                    return;
-                }
-
-                blocks.Add(Rectangle.FromLTRB(bounds.Left, bounds.Top, bounds.Left + (int)(160 * scale), bounds.Bottom));
-                blocks.Add(Rectangle.FromLTRB(start.Left, bounds.Top, bounds.Right, bounds.Bottom));
-            }
-
-            Rectangle slot = TaskbarLayout.PositionedSlot(bounds, blocks, desired, minimum, (int)(12 * scale), height, drag.IsActive ? "custom" : Config.TaskbarPosition, drag.IsActive ? drag.RequestedX : bounds.Left + (int)(Config.TaskbarCustomOffset * scale));
+            Rectangle slot = TaskbarLayout.PositionedSlot(bounds, blocks, desired, minimum, (int)(12 * scale), height, drag.IsActive ? "custom" : Config.TaskbarPosition, drag.IsActive ? drag.RequestedX : bounds.Left + (int)(Config.TaskbarCustomOffset * scale), !drag.IsActive);
             if (slot.IsEmpty)
             {
                 Hide();
@@ -462,6 +466,12 @@ namespace TokenDock
 
         void WriteDiagnostic()
         {
+            if (notifiedPlacement != placement)
+            {
+                notifiedPlacement = placement;
+                if (PlacementChanged != null)
+                    PlacementChanged();
+            }
             if (!IsHandleCreated)
                 return;
             if (drag.IsActive)

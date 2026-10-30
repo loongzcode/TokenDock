@@ -25,6 +25,7 @@ namespace TokenDock
         public bool QuotaRecoveryAlertsEnabled { get; set; }
         public bool HistoryEnabled { get; set; }
         public bool TaskbarPositionLocked { get; set; }
+        public bool CheckUpdatesEnabled { get; set; }
         public List<ReceiverBinding> Flx1Receivers { get; set; }
         public string CodexMetric { get; set; }
         public string ClaudeMetric { get; set; }
@@ -59,6 +60,7 @@ namespace TokenDock
             };
             QuotaRecoveryAlertsEnabled = true;
             HistoryEnabled = true;
+            CheckUpdatesEnabled = true;
             Flx1Receivers = new List<ReceiverBinding>();
             CodexMetric = ClaudeMetric = "auto";
             HiddenDeviceIds = new List<string>();

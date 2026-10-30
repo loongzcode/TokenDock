@@ -35,6 +35,21 @@ namespace TokenDock
                 {
                     OverviewRenderer.Render(args[1]);
                 }
+                else if (args.Length >= 2 && args[0] == "--render-details-updates")
+                {
+                    DetailsAndUpdateTests.Render(args[1]);
+                }
+                else if (args.Length >= 2 && (args[0] == "--check-update" || args[0] == "--download-update"))
+                {
+                    System.Threading.SynchronizationContext.SetSynchronizationContext(null);
+                    using (var client = new UpdateClient())
+                    {
+                        var release = client.CheckAsync().GetAwaiter().GetResult();
+                        if (args[0] == "--download-update")
+                            client.DownloadAsync(release, System.IO.Path.Combine(System.IO.Path.GetDirectoryName(args[1]), "verified-update-download"), null, System.Threading.CancellationToken.None).GetAwaiter().GetResult();
+                        System.IO.File.WriteAllText(args[1], Json.Write(new { tag = release.Tag, package = release.FileName, newer = release.IsNewerThan(new Version(AppIdentity.Version)) }));
+                    }
+                }
                 else if (args.Length >= 4 && args[0] == "--probe-flx1")
                 {
                     var settings = new Settings();
@@ -51,6 +66,7 @@ namespace TokenDock
                     Console.WriteLine(IconAndLockTests.Run());
                     Console.WriteLine(ModernUiTests.Run());
                     Console.WriteLine(ReceiverPowerTests.Run());
+                    Console.WriteLine(DetailsAndUpdateTests.Run());
                 }
 
                 return 0;

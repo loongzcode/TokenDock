@@ -132,6 +132,23 @@ namespace TokenDock
                 SynchronizationContext.SetSynchronizationContext(previous);
             }
 
+            var taskbar = new Rectangle(0, 1000, 1920, 48);
+            var normalBlocks = new[] { new Rectangle(0, 1000, 100, 48), new Rectangle(600, 1000, 600, 48), new Rectangle(1800, 1000, 120, 48) };
+            var savedPosition = TaskbarLayout.PositionedSlot(taskbar, normalBlocks, 352, 120, 12, 28, "custom", 1280, true);
+            check(savedPosition.Left == 1280, "saved right-side position survives routine layout");
+            var narrowBlocks = new[] { normalBlocks[0], new Rectangle(600, 1000, 1120, 48), normalBlocks[2] };
+            check(TaskbarLayout.PositionedSlot(taskbar, narrowBlocks, 352, 120, 12, 28, "custom", 1280, true).IsEmpty, "insufficient space at saved position never falls back to a large left-side gap");
+            var occupiedRight = new[] { normalBlocks[0], new Rectangle(600, 1000, 1320, 48) };
+            check(TaskbarLayout.PositionedSlot(taskbar, occupiedRight, 352, 120, 12, 28, "custom", 1280, true).IsEmpty, "fully occupied right region hides instead of crossing application buttons");
+            check(TaskbarLayout.PositionedSlot(taskbar, null, 352, 120, 12, 28, "custom", 1280, true).IsEmpty, "unavailable occupancy never produces a guessed left-side placement");
+            check(TaskbarLayout.PositionedSlot(taskbar, normalBlocks, 352, 120, 12, 28, "custom", 1280, true) == savedPosition, "position recovers when the original free region returns");
+            var dragged = TaskbarLayout.PositionedSlot(taskbar, normalBlocks, 352, 120, 12, 28, "custom", 200, false);
+            check(dragged.Left == 200, "explicit dragging can still move a saved right-side widget to the left");
+            var expanded = TaskbarLayout.PositionedSlot(taskbar, normalBlocks, 1000, 120, 12, 28, "custom", 1280, true);
+            check(expanded.Left >= 1212 && expanded.Right <= 1788, "growing content does not move the saved anchor to the opposite side");
+            var shiftedTaskbar = new Rectangle(-1920, 1000, 1920, 48);
+            var shiftedBlocks = normalBlocks.Select(r => new Rectangle(r.Left - 1920, r.Top, r.Width, r.Height)).ToArray();
+            check(TaskbarLayout.PositionedSlot(shiftedTaskbar, shiftedBlocks, 352, 120, 12, 28, "custom", -640, true).Left == -640, "saved region works with a negative monitor origin");
             return "PASS " + count + " taskbar experience checks";
         }
 

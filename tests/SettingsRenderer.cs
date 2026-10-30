@@ -32,6 +32,7 @@ namespace TokenDock
 
         static void Draw(Control control, Graphics graphics, Point point, Control currentPage)
         {
+            if (control is ProgressBar && !control.Visible) return;
             if (control is SettingsPage && control != currentPage)
                 return;
             if (control is Panel || control is SettingsPage)

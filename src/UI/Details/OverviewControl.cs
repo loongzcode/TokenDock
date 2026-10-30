@@ -15,6 +15,15 @@ namespace TokenDock
         float scale = 1;
         int scroll, contentHeight;
         readonly ModernButton refreshButton, historyButton, settingsButton, closeButton;
+        readonly ModernButton allButton;
+        public string SelectedKey { get; private set; }
+        public void SelectItem(string key)
+        {
+            SelectedKey = DetailSelection.Normalize(key);
+            scroll = 0;
+            allButton.Visible = SelectedKey != null;
+            Changed();
+        }
         readonly Timer resultTimer = new Timer
         {
             Interval = 2000
@@ -24,6 +33,7 @@ namespace TokenDock
         public event Action SettingsRequested;
         public event Action HistoryRequested;
         public event Action CloseRequested;
+        public event Action AllRequested;
         public OverviewControl(UsageMonitor m, TaskbarControl b)
         {
             monitor = m;
@@ -68,6 +78,9 @@ namespace TokenDock
                 TabStop = false
             };
             Controls.AddRange(new Control[] { refreshButton, historyButton, settingsButton, closeButton });
+            allButton = new ModernButton { Text = "全部", Name = "ShowAllDetails", AccessibleName = "返回全部用量与电量", Subtle = true, Visible = false };
+            Controls.Add(allButton);
+            allButton.Click += delegate { SelectItem(null); if (AllRequested != null) AllRequested(); };
             refreshButton.Click += async delegate
             {
                 await RefreshAsync();
@@ -105,7 +118,11 @@ namespace TokenDock
 
         void Changed()
         {
-            AccessibleDescription = monitor.Codex.Detail + "；" + monitor.Claude.Detail + "；" + monitor.DeepSeek.Detail;
+            AccessibleDescription = string.Join("；", new[] {
+                DetailSelection.Includes(SelectedKey, "codex") ? monitor.Codex.Detail : null,
+                DetailSelection.Includes(SelectedKey, "claude") ? monitor.Claude.Detail : null,
+                DetailSelection.Includes(SelectedKey, "deepseek") ? monitor.DeepSeek.Detail : null
+            }.Where(value => !string.IsNullOrEmpty(value)));
             Invalidate();
         }
 
@@ -123,26 +140,46 @@ namespace TokenDock
             int y = 72 - scroll;
             var clip = g.Clip;
             g.SetClip(new RectangleF(0, 64, w, Math.Max(1, Height / scale - 132)));
-            UsageSnapshot(g, monitor.Codex, 24, ref y, w - 48);
-            UsageSnapshot(g, monitor.Claude, 24, ref y, w - 48);
-            UsageSnapshot(g, monitor.DeepSeek, 24, ref y, w - 48);
+            if (SelectedKey == null && bar != null && monitor.Config.ShowBar && bar.Placement != "任务栏控件已显示")
+            {
+                Theme.TextAt(g, bar.Placement, 11, false, Theme.Muted, 24, y, w - 48, 32);
+                y += 36;
+            }
+            if (DetailSelection.Includes(SelectedKey, "codex")) UsageSnapshot(g, monitor.Codex, 24, ref y, w - 48);
+            if (DetailSelection.Includes(SelectedKey, "claude")) UsageSnapshot(g, monitor.Claude, 24, ref y, w - 48);
+            if (DetailSelection.Includes(SelectedKey, "deepseek")) UsageSnapshot(g, monitor.DeepSeek, 24, ref y, w - 48);
+            if (SelectedKey == null || SelectedKey.StartsWith("device:"))
+            {
             y += 8;
             Theme.TextAt(g, "设备电量", 12, true, Theme.Muted, 24, y, w - 48, 24);
             y += 32;
-            if (monitor.Devices.Count == 0)
+            var devices = monitor.Devices.Where(d => DetailSelection.Includes(SelectedKey, "device:" + d.Identity)).OrderByDescending(d => d.connected == true).ToArray();
+            if (!monitor.BluetoothUpdated.HasValue)
             {
-                Theme.TextAt(g, "连接蓝牙设备后会自动出现", 12, false, Theme.Muted, 24, y, w - 48, 28);
+                Theme.TextAt(g, (monitor.BluetoothStatus ?? "等待设备读取"), 11, false, Theme.Muted, 24, y, w - 48, 32);
+                y += 36;
+            }
+            if (devices.Length == 0)
+            {
+                Theme.TextAt(g, SelectedKey == null ? "连接蓝牙设备后会自动出现" : "该设备当前不可用，刷新后重试", 12, false, Theme.Muted, 24, y, w - 48, 28);
                 y += 40;
             }
 
-            foreach (var d in monitor.Devices.OrderByDescending(x => x.connected == true))
+            foreach (var d in devices)
             {
                 string value = d.connected == false ? "未连接" : d.charging == true ? "充电中" : d.battery.HasValue ? d.battery.Value.ToString("0") + "%" : "电量未知";
-                Color c = d.connected == true ? Theme.Text : Theme.Muted;
+                if (!monitor.BluetoothUpdated.HasValue && d.battery.HasValue) value = "旧 " + value;
+                Color c = d.connected == true && monitor.BluetoothUpdated.HasValue ? Theme.Text : Theme.Muted;
                 ItemIcons.DrawDevice(g, DeviceIconResolver.ResolveDevice(d), 26, y + 9, 16, c);
-                Theme.TextAt(g, d.name.Trim(), 13, false, c, 52, y, w - 196, 36);
+                Theme.TextAt(g, (d.name ?? "设备").Trim(), 13, false, c, 52, y, w - 196, 36);
                 Theme.TextAt(g, value, 12, false, c, new RectangleF(w - 148, y, 124, 36), StringAlignment.Far);
                 y += 44;
+                if (SelectedKey != null)
+                {
+                    Theme.TextAt(g, (d.source ?? "") + (monitor.BluetoothUpdated.HasValue ? " · 更新于 " + monitor.BluetoothUpdated.Value.ToString("HH:mm:ss") : " · 数据未更新"), 11, false, Theme.Muted, 24, y, w - 48, 32);
+                    y += 36;
+                }
+            }
             }
 
             contentHeight = y + scroll;
@@ -159,25 +196,37 @@ namespace TokenDock
 
         void UsageSnapshot(Graphics g, UsageSnapshot p, int x, ref int y, float width)
         {
-            string value = p.Name == "DeepSeek" ? (p.Stale ? "--" : p.Status) : p.Compact;
+            string value = p.Name == "DeepSeek" ? (p.Stale ? "--" : p.Status ?? "暂无数据") : p.Compact;
+            var health = UsageHealth.Read(p, DateTime.Now, monitor.Config.RefreshSeconds);
             if (p.Quotas.Count == 0 && p.Name != "DeepSeek")
                 value = "未连接";
             if (p.Name == "DeepSeek" && !value.StartsWith("¥") && !value.StartsWith("$"))
                 value = "未连接";
+            if (health.IsIssue || !p.Updated.HasValue)
+                value = health.Label;
+            else if (p.Quotas.Count == 0 && p.Name != "DeepSeek" && (p.LifetimeTokens.HasValue || MetricFormatter.SessionTokens(p).HasValue))
+                value = "已连接";
             Theme.TextAt(g, p.Name, 14, true, Theme.Text, x, y, width - 120, 28);
             Theme.TextAt(g, value, 16, true, Theme.Text, new RectangleF(x + width - 120, y, 120, 28), StringAlignment.Far);
             y += 30;
+            if (health.IsIssue)
+            {
+                Theme.TextAt(g, health.Hint, 11, false, Theme.Muted, x, y, width, 32);
+                y += 36;
+                Theme.TextAt(g, p.Updated.HasValue ? "上次成功：" + p.Updated.Value.ToString("MM-dd HH:mm:ss") : "尚未成功读取", 11, false, Theme.Muted, x, y, width, 22);
+                y += 26;
+            }
             if (p.Quotas.Count > 0)
             {
                 foreach (var q in p.Quotas.Take(3))
                 {
-                    string remaining = q.Expired ? "等待更新" : q.Remaining.ToString("0.#") + "%";
+                    string remaining = q.Expired ? "等待更新" : (health.IsIssue ? "旧 " : "") + q.Remaining.ToString("0.#") + "%";
                     Theme.TextAt(g, q.Label, 12, false, Theme.Muted, x, y, width - 90, 24);
                     Theme.TextAt(g, remaining, 12, false, Theme.Muted, new RectangleF(x + width - 90, y, 90, 24), StringAlignment.Far);
                     y += 27;
                     Theme.Round(g, new RectangleF(x, y, width, 4), 2, Theme.Line);
                     if (!q.Expired && q.Remaining > 0)
-                        Theme.Round(g, new RectangleF(x, y, Math.Max(4, width * (float)q.Remaining / 100), 4), 2, q.Remaining <= 15 ? Color.FromArgb(202, 113, 61) : Theme.Accent);
+                        Theme.Round(g, new RectangleF(x, y, Math.Max(4, width * (float)q.Remaining / 100), 4), 2, health.IsIssue ? Theme.Muted : q.Remaining <= 15 ? Color.FromArgb(202, 113, 61) : Theme.Accent);
                     y += 12;
                     if (q.Resets.HasValue)
                     {
@@ -186,13 +235,14 @@ namespace TokenDock
                     }
                 }
             }
-            else
+            else if (!health.IsIssue)
             {
                 string hint = p.Name == "Claude Code" ? "连接 Claude Code 查看订阅额度" : p.Name == "DeepSeek" ? "输入 API Key 查看余额" : "正在读取本机 Codex 登录状态";
                 if (value.StartsWith("¥") || value.StartsWith("$"))
                     hint = "官方 API 余额";
                 if (p.Status == "读取失败")
                     hint = "读取失败，请检查登录或网络后刷新";
+                if (health.IsIssue) hint = "可刷新重试，或检查连接设置";
                 Theme.TextAt(g, hint, 12, false, Theme.Muted, x, y, width, 24);
                 y += 27;
             }
@@ -201,6 +251,11 @@ namespace TokenDock
             if (!string.IsNullOrEmpty(tokenLine) && p.Name != "DeepSeek")
             {
                 Theme.TextAt(g, tokenLine, 11, false, Theme.Muted, x, y, width, 22);
+                y += 22;
+            }
+            if (!health.IsIssue && p.Updated.HasValue)
+            {
+                Theme.TextAt(g, "更新于 " + p.Updated.Value.ToString("HH:mm:ss"), 11, false, Theme.Muted, x, y, width, 22);
                 y += 22;
             }
 
@@ -219,6 +274,7 @@ namespace TokenDock
             historyButton.Bounds = bounds[1];
             settingsButton.Bounds = bounds[2];
             closeButton.Bounds = bounds[3];
+            if (allButton != null) allButton.Bounds = new Rectangle((int)(Width - 116 * scale), (int)(16 * scale), (int)(54 * scale), (int)(32 * scale));
         }
 
         protected override void OnResize(EventArgs e)
@@ -247,7 +303,7 @@ namespace TokenDock
                 await monitor.Refresh(true);
                 if (IsDisposed)
                     return;
-                bool failed = monitor.Codex.Stale || monitor.Claude.Stale || monitor.DeepSeek.Stale || monitor.BluetoothStatus.StartsWith("设备扫描失败");
+                bool failed = UsageHealth.Issues(monitor, null, DateTime.Now).Count > 0;
                 refreshButton.Text = failed ? "部分失败" : "已刷新";
                 refreshButton.Glyph = failed ? "refresh" : "check";
                 refreshButton.Selected = !failed;
