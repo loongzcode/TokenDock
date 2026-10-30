@@ -1,0 +1,16 @@
+应用标识资源
+
+Codex：来自本机 OpenAI.Codex 官方安装包中的公开静态资源
+webview/assets/codex-app-ga-logo-3e5209898ca3.png
+产品：https://openai.com/codex/
+
+Claude：https://claude.com/icon.png
+DeepSeek：https://www.deepseek.com/favicon.ico
+
+这些标识用于区分对应服务，品牌及商标权利归各自所有者。
+图像以内嵌资源随程序发布，运行时不联网下载图标。
+
+设备类型图标
+键盘、鼠标、耳机和通用蓝牙图标由本项目使用矢量线条绘制。
+设备名称明确包含类型或已知键盘型号时使用对应类型，无法识别时使用通用蓝牙标识。
+不根据设备名称猜测厂商商标，当前没有内置设备品牌 Logo。

@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TokenDock", "src\TokenDock.csproj", "{11BE0B09-4E28-4177-A1EB-10BE681B1431}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TokenDock.Tests", "tests\TokenDock.Tests.csproj", "{CB838E7A-F02B-476E-9AA5-D030A8AD234A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{11BE0B09-4E28-4177-A1EB-10BE681B1431}.Debug|Any CPU.ActiveCfg = Debug|AnyCPU
+		{11BE0B09-4E28-4177-A1EB-10BE681B1431}.Debug|Any CPU.Build.0 = Debug|AnyCPU
+		{11BE0B09-4E28-4177-A1EB-10BE681B1431}.Release|Any CPU.ActiveCfg = Release|AnyCPU
+		{11BE0B09-4E28-4177-A1EB-10BE681B1431}.Release|Any CPU.Build.0 = Release|AnyCPU
+		{CB838E7A-F02B-476E-9AA5-D030A8AD234A}.Debug|Any CPU.ActiveCfg = Debug|AnyCPU
+		{CB838E7A-F02B-476E-9AA5-D030A8AD234A}.Debug|Any CPU.Build.0 = Debug|AnyCPU
+		{CB838E7A-F02B-476E-9AA5-D030A8AD234A}.Release|Any CPU.ActiveCfg = Release|AnyCPU
+		{CB838E7A-F02B-476E-9AA5-D030A8AD234A}.Release|Any CPU.Build.0 = Release|AnyCPU
+	EndGlobalSection
+EndGlobal

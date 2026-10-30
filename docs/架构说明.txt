@@ -1,0 +1,71 @@
+模块与依赖
+
+Program 只处理启动、迁移、单实例和退出。
+ApplicationController 负责把后台刷新、任务栏、详情、设置与通知连接起来。
+
+平台接入
+IUsageProvider 定义读取快照的合同。
+CodexProvider 负责解析与账户读取；CodexAppServerClient 封装本机 CLI 的协议会话。
+ClaudeProvider 负责快照解析、状态栏配置生成及字段白名单。
+DeepSeekProvider 负责余额请求和金额解析。
+新增平台应先实现接口，再在 UsageMonitor 注册，显示与提醒消费统一快照。
+
+蓝牙
+BluetoothService 把 Windows 扫描结果转换为 BluetoothSnapshot。
+bluetooth.ps1 保留为 Windows 平台适配层，读取系统 PnP 和标准 BLE 电量。
+DeviceIdentity.ps1 统一容器 GUID 和硬件地址，合并同一设备的端点并匹配 PnP 电量。
+BluetoothConnectionWatcher 使用 Windows DeviceWatcher 监听已配对 Classic / LE 端点。
+DeviceRefreshSchedule 合并事件突发并安排电量补读，UsageMonitor.RefreshBluetooth 单独刷新设备且串行查询。
+监听失败保留定时扫描；bluetooth-watch-status.json 提供不含凭证的运行状态。
+Windows 接口依据：https://learn.microsoft.com/en-us/windows/apps/develop/devices-sensors/enumerate-devices
+设备用稳定 ID 关联，不以品牌清单决定基础支持。
+
+刷新
+UsageMonitor 统一处理刷新间隔、上一份数据、失败状态和变更事件。
+UI 不发送 HTTP，不启动 Codex 子进程，不负责蓝牙枚举。
+IUsageProvider、IBluetoothSource 可以替换为假数据源，独立测试不需要真实账户。
+
+任务栏
+TaskbarItemBuilder 决定实际显示哪些平台、指标和设备。
+TaskbarOrder 负责稳定排序、顺序规范化和移动规则，设置和任务栏菜单共用 ItemOrderWindow。
+MetricFormatter 选择额度窗口或格式化已有 Token 计数。
+TaskbarLayout 计算可用空位和放置位置，保持纯几何逻辑。
+TaskbarOccupancyReader 读取任务栏占用区域。
+TaskbarDrawing 负责布局测量与绘制。
+ItemIcons 管理内嵌品牌位图与设备矢量图，DeviceIconResolver 只判定明确的设备类型，不猜测品牌商标。
+TaskbarPositionLocked 从设置持久化到拖动控制器，禁止手势开始、预览与提交；锁定不影响点击。
+紧凑模式和悬停命中共用相同的测量逻辑，拖动预览沿用同一显示样式。
+HoverContent 生成可测试的速览内容，HoverPreview 负责无激活窗口、缩放和屏幕边界放置。
+LayeredSurface 封装位图、透明合成和 GDI 资源。
+TaskbarDragController 负责鼠标捕获、拖动预览、落点提交与取消。
+TaskbarControl 负责控件生命周期和这些模块的协调。
+
+通知
+AlertEngine 是无 UI 副作用的阈值与去重规则。
+QuotaRecoveryTracker 以窗口身份关联前后两次成功观察，区分周期更新、低位恢复、首次读取和陈旧数据。
+NotificationService 将规则结果合并后交给 Windows 托盘通知。
+测试只验证规则，不向用户弹出测试提醒。
+
+设置
+UI/Controls 下的 ModernButton、ModernToggle、FieldFrame、ModernComboBox、SettingsCard 只处理外观与基础交互。
+ModernToggle 保留 CheckBox 状态与键盘行为，当前使用紧凑复选框外观；SettingsCard 当前作为细线分组容器，不绘制卡片。
+OverviewFooterLayout 为详情按钮计算物理命中区域；OverviewControl 使用真实子按钮绑定操作，刷新任务共享并反馈成功或部分失败。
+设置窗口负责导航、保存事务和屏幕边界适配，各页面按业务分组，不在样式控件中处理账户逻辑。
+Settings 负责配置模型与默认值；ProtectedSecretStore 负责 DPAPI。
+AppPaths 固定跨版本数据位置并提供白名单迁移。
+StartupRegistration 单独管理本应用的开机启动条目。
+SettingsWindow 只负责页面切换和保存事务。
+ConnectionPage、DisplayPage、AlertsPage 分别编辑连接、常驻显示和阈值。
+保存时先生成新配置、统一校验并原子写入，再切换运行配置。
+
+历史
+HistoryCapture 仅从成功快照提取额度、余额、电量白名单字段，按来源更新时间去重与节流。
+HistoryRecorder 合并变更并在后台写入，HistoryStore 使用逐日 JSONL 与 30 日保留，不对用户目录做递归清理。
+HistorySeries 负责时间筛选和缺口/重置分段，HistoryChart 与 HistoryWindow 只消费真实采样。
+历史文件支持隔离损坏行、断行后继续追加，读取时去除重复采样；不同金额币种不合并绘图。
+
+测试与发布
+TokenDock.Tests 是独立程序集，通过 InternalsVisibleTo 测试内部模块。
+运行包只包含程序、运行配置、蓝牙脚本与说明。
+源码包只复制明确的项目文件与源码目录；不收集 data、API Key、bin、obj 或个人凭证。
+文件拆分不意味着每个模块单独编译成 DLL；当前仍发布一个主程序。
